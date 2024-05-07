@@ -1,0 +1,4 @@
+humidityTemperatureExample/MQTTconfig.h
+humidityTemperatureExample/WIFIconfig.h
+motionSensorExample/MQTTconfig.h
+motionSensorExample/WIFIconfig.h
