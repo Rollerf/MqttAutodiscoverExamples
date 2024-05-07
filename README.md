@@ -8,12 +8,14 @@ I use the board ESP32 Dev Module.
 ## Configuration motion sensor example
 You'll need your own variables for MQTT and WIFI connection. I use in this format:
 
-WIFI connection file, WIFIconfig.h:
+WIFIconfig.h:
+```c
 const char *ssid = "";
 const char *password = "";
 const char *HOMEASSISTANT_URL = "";
-
-MQTT connection file:
+```
+MQTTconfig.h:
+```c
 const char *mqtt_broker = "";
 const char *topicConfig = "homeassistant/binary_sensor/garden/config";
 const char *topicState = "homeassistant/binary_sensor/garden/state";
@@ -21,3 +23,4 @@ const char *mqtt_username = "";
 const char *mqtt_password = "";
 const int mqtt_port = ;
 const char *client_name = "";
+```
