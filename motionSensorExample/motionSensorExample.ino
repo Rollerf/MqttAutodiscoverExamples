@@ -5,37 +5,18 @@
 #include <ArduinoOTA.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-#include <Timer.h>
-
-// CONSTANTS:
-const boolean START = true;
-const boolean RESET = false;
-
-// TIMERS:
-TON *tPublishState;
-TON *tCheckConnection;
-
-const unsigned long ONE_SECOND = 1000;
-const unsigned long FIVE_SECOND = 5000;
-const unsigned long ONE_MINUTE = 60000;
-
-// INPUTS
-
-// OUTPUTS
 
 // Objects
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 // STATE VARIABLES
-boolean commandReceived = false;
-char *state = "";
 boolean deviceConfigured = false;
 
 //TODO: Parece que esta prueba funciona
-void buildDeviceConfig(){
+void buildDeviceConfig() {
   StaticJsonDocument<512> doc;
-  
+
   String payload = "";
   doc["name"] = nullptr;
   doc["device_class"] = "motion";
@@ -43,12 +24,12 @@ void buildDeviceConfig(){
   doc["unique_id"] = "motion01ad";
   doc["device"]["identifiers"][0] = "01ad";
   doc["device"]["name"] = "Garden movement sensor";
-  
+
   serializeJson(doc, payload);
 
   Serial.print("Send config: ");
   Serial.println((char *)payload.c_str());
-  
+
   client.publish(topicConfig, (char *)payload.c_str());
 }
 
@@ -63,33 +44,20 @@ void setup()
   MQTTConnection();
 
   Serial.println("Connected to the WiFi network");
-  
-  tPublishState = new TON(FIVE_SECOND);
-  tCheckConnection = new TON(ONE_MINUTE);
 }
 
 void publishInfo()
 {
-  if (tPublishState->IN(START))
-  {
-    String payload = "OFF";
-    
-    client.publish(topicState, (char *)payload.c_str());
+  String payload = "OFF";
 
-    tPublishState->IN(RESET);
-  }
+  client.publish(topicState, (char *)payload.c_str());
 }
 
 void checkMqttConnection()
 {
-  if (tCheckConnection->IN(START))
+  if (!client.connected())
   {
-    if (!client.connected())
-    {
-      ESP.restart();
-    }
-
-    tCheckConnection->IN(RESET);
+    ESP.restart();
   }
 }
 
@@ -99,18 +67,15 @@ void loop()
   client.loop();
   yield();
   checkMqttConnection();
+  delay(1000);
 
-  if (commandReceived)
-  {
-    
-  }
-
-  if(client.connected() && !deviceConfigured){
+  if (client.connected() && !deviceConfigured) {
     buildDeviceConfig();
     deviceConfigured = true;
   }
 
   publishInfo();
+  delay(1000);
 }
 
 void WIFIConnection()
@@ -133,7 +98,7 @@ void OTAConfig()
 {
   ArduinoOTA.setHostname(client_name);
   ArduinoOTA.onStart([]()
-                     {
+  {
     String type;
     if (ArduinoOTA.getCommand() == U_FLASH) {
       type = "sketch";
@@ -142,13 +107,18 @@ void OTAConfig()
     }
 
     // NOTE: if updating FS this would be the place to unmount FS using FS.end()
-    Serial.println("Start updating " + type); });
+    Serial.println("Start updating " + type);
+  });
   ArduinoOTA.onEnd([]()
-                   { Serial.println("\nEnd"); });
+  {
+    Serial.println("\nEnd");
+  });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
-                        { Serial.printf("Progress: %u%%\r", (progress / (total / 100))); });
+  {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
   ArduinoOTA.onError([](ota_error_t error)
-                     {
+  {
     Serial.printf("Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) {
       Serial.println("Auth Failed");
@@ -160,7 +130,8 @@ void OTAConfig()
       Serial.println("Receive Failed");
     } else if (error == OTA_END_ERROR) {
       Serial.println("End Failed");
-    } });
+    }
+  });
   ArduinoOTA.begin();
 }
 
@@ -168,7 +139,6 @@ void MQTTConnection()
 {
   // connecting to a mqtt broker
   client.setServer(mqtt_broker, mqtt_port);
-  client.setCallback(callback);
 
   while (!client.connected())
   {
@@ -187,30 +157,4 @@ void MQTTConnection()
       ESP.restart();
     }
   }
-
-  client.subscribe(topicCommand);
-}
-
-void callback(char *topicCommand, byte *payload, unsigned int length)
-{
-  Serial.print("Message arrived in topic: ");
-  Serial.println(topicCommand);
-  Serial.print("Message:");
-  String payload_n;
-
-  for (int i = 0; i < length; i++)
-  {
-    payload_n += (char)payload[i];
-  }
-
-  Serial.println(payload_n);
-  Serial.println("-----------------------");
-
-  StaticJsonDocument<256> doc;
-  DeserializationError error = deserializeJson(doc, payload_n);
-
-  if (error)
-    return;
-
-  String command = doc["portal"]["orden"];
 }

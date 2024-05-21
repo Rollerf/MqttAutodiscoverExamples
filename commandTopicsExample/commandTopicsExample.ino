@@ -15,25 +15,25 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 // STATE VARIABLES
+String commandReceived = "";
+char *state = "";
 boolean deviceConfigured = false;
 
-void buildTemperatureDeviceConfig() {
+//Times:
+unsigned long checkConnectionMillis = 0;
+unsigned long publishInfoMillis = 0;
+
+void buildDeviceConfig() {
   JsonDocument doc;
-  doc["device_class"] = "temperature";
-  doc["state_topic"] = "homeassistant/sensor/sensorBedroom/state";
-  doc["unit_of_measurement"] = "°C";
-  doc["value_template"] = "{{ value_json.temperature}}";
-  doc["unique_id"] = "temp01ae";
+
+  doc["name"] = "Irrigation";
+  doc["command_topic"] = "homeassistant/switch/irrigation/set";
+  doc["state_topic"] = "homeassistant/switch/irrigation/state";
+  doc["unique_id"] = "irr01ad";
 
   JsonObject device = doc["device"].to<JsonObject>();
-  device["identifiers"][0] = "bedroom01ae";
-  device["name"] = "Bedroom";
-  device["manufacturer"] = "Example sensors Ltd.";
-  device["model"] = "K9";
-  device["serial_number"] = "12AE3010545";
-  device["hw_version"] = "1.01a";
-  device["sw_version"] = "2024.1.0";
-  device["configuration_url"] = "https://example.com/sensor_portal/config";
+  device["identifiers"][0] = "garden01ad";
+  device["name"] = "Garden";
 
   String output;
 
@@ -44,32 +44,7 @@ void buildTemperatureDeviceConfig() {
   Serial.print("Send config: ");
   Serial.println((char *)output.c_str());
 
-  client.publish(topicTemperatureConfig, (char *)output.c_str());
-}
-
-void buildHumidityDeviceConfig() {
-  JsonDocument doc;
-  String payload = "";
-
-  doc["device_class"] = "humidity";
-  doc["state_topic"] = "homeassistant/sensor/sensorBedroom/state";
-  doc["unit_of_measurement"] = "%";
-  doc["value_template"] = "{{ value_json.humidity}}";
-  doc["unique_id"] = "hum01ae";
-
-  JsonObject device = doc.createNestedObject("device");
-
-  JsonArray identifiers = device.createNestedArray("identifiers");
-  identifiers.add("bedroom01ae");
-
-  doc.shrinkToFit();  // optional
-
-  serializeJson(doc, payload);
-
-  Serial.print("Send config: ");
-  Serial.println((char *)payload.c_str());
-
-  client.publish(topicHumidityConfig, (char *)payload.c_str());
+  client.publish(topicConfig, (char *)output.c_str());
 }
 
 void setup()
@@ -95,17 +70,11 @@ void setup()
 
 void publishInfo()
 {
-  StaticJsonDocument<512> doc;
-
-  String payload;
-  doc["temperature"] = 23.20;
-  doc["humidity"] = 43.70;
-  serializeJson(doc, payload);
 
   Serial.print("Send state: ");
-  Serial.println((char *)payload.c_str());
+  Serial.println(commandReceived);
 
-  client.publish(topicState, (char *)payload.c_str());
+  client.publish(topicState, (char *)commandReceived.c_str());
 }
 
 void checkMqttConnection()
@@ -122,18 +91,22 @@ void loop()
   client.loop();
   yield();
   delay(1000);
-  checkMqttConnection();
-  delay(1000);
+
+  if (checkConnectionMillis + 2000 < millis()) {
+    checkMqttConnection();
+    checkConnectionMillis = millis();
+  }
 
   if (client.connected() && !deviceConfigured) {
-    buildTemperatureDeviceConfig();
-    delay(1000);
-    buildHumidityDeviceConfig();
+    buildDeviceConfig();
     delay(1000);
     deviceConfigured = true;
   }
 
-  publishInfo();
+  if (publishInfoMillis + 1000 < millis()) {
+    publishInfo();
+    publishInfoMillis = millis();
+  }
 }
 
 void WIFIConnection()
@@ -197,6 +170,7 @@ void MQTTConnection()
 {
   // connecting to a mqtt broker
   client.setServer(mqtt_broker, mqtt_port);
+  client.setCallback(callback);
 
   while (!client.connected())
   {
@@ -215,4 +189,24 @@ void MQTTConnection()
       ESP.restart();
     }
   }
+
+  client.subscribe(topicCommand);
+}
+
+void callback(char *topicCommand, byte *payload, unsigned int length)
+{
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topicCommand);
+  Serial.print("Message:");
+  String payload_n;
+
+  for (int i = 0; i < length; i++)
+  {
+    payload_n += (char)payload[i];
+  }
+
+  commandReceived = payload_n;
+
+  Serial.println(commandReceived);
+  Serial.println("-----------------------");
 }
